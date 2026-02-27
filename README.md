@@ -27,7 +27,7 @@ Each account needs two things: **Organization ID** and **Session Cookie**.
   const sessionKey = document.cookie.split('; ').find(r => r.startsWith('sessionKey='))?.split('=')[1];
   console.log('\n%c Claude Credentials ', 'background:#2c84db;color:white;font-weight:bold;padding:4px 8px;border-radius:4px');
   console.log(`Org ID:         ${orgId || '(not found)'}`);
-  console.log(`Session Cookie: ${sessionKey || '(not found)'}`);
+  console.log(`Session Cookie: ${sessionKey || '(not found — grab it manually from Application > Cookies, look for sessionKey starting with sk-ant-sid)'}`);
   if (orgId && sessionKey) {
     const data = JSON.stringify({ orgId, sessionCookie: sessionKey }, null, 2);
     console.log(`\nReady to paste:\n${data}`);
@@ -47,7 +47,8 @@ Each account needs two things: **Organization ID** and **Session Cookie**.
 
 **Session Cookie:**
 1. Same Cookies panel
-2. Find the `sessionKey` cookie — that value is your Session Cookie
+2. Find the `sessionKey` cookie (starts with `sk-ant-sid...`) — that value is your Session Cookie
+   - Note: this cookie is `HttpOnly` so `document.cookie` can't read it — you must grab it from the Cookies panel
 
 ### Option 3: Network tab
 
