@@ -202,6 +202,151 @@
       font-size: 12px;
       color: #787877;
     }
+
+    .manage-btn {
+      background: transparent;
+      color: #a3a3a0;
+      border: 1px solid #3a3a3a;
+      border-radius: 6px;
+      padding: 6px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+
+    .manage-btn:hover {
+      border-color: #5a5a5a;
+      color: #e8e6e1;
+    }
+
+    .settings-panel {
+      display: none;
+      max-width: 720px;
+      margin: 0 auto 32px;
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      border-radius: 12px;
+      padding: 24px;
+    }
+
+    .settings-panel.open {
+      display: block;
+    }
+
+    .settings-panel h2 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #faf9f5;
+      margin-bottom: 20px;
+    }
+
+    .account-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 2fr auto;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .account-row input {
+      background: #1a1a1a;
+      border: 1px solid #3a3a3a;
+      border-radius: 6px;
+      color: #e8e6e1;
+      padding: 8px 10px;
+      font-size: 13px;
+      font-family: inherit;
+      width: 100%;
+    }
+
+    .account-row input:focus {
+      outline: none;
+      border-color: #2c84db;
+    }
+
+    .account-row input::placeholder {
+      color: #555;
+    }
+
+    .delete-btn {
+      background: transparent;
+      border: 1px solid #3a3a3a;
+      color: #ef4444;
+      border-radius: 6px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: background 0.2s;
+    }
+
+    .delete-btn:hover {
+      background: rgba(239, 68, 68, 0.1);
+    }
+
+    .settings-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .add-btn {
+      background: transparent;
+      color: #2c84db;
+      border: 1px dashed #3a3a3a;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+
+    .add-btn:hover {
+      border-color: #2c84db;
+    }
+
+    .save-btn {
+      background: #2c84db;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 20px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .save-btn:hover {
+      opacity: 0.85;
+    }
+
+    .save-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .save-status {
+      font-size: 13px;
+      color: #4ade80;
+      align-self: center;
+    }
+
+    .save-status.error {
+      color: #ef4444;
+    }
+
+    .field-labels {
+      display: grid;
+      grid-template-columns: 1fr 1fr 2fr auto;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .field-labels span {
+      font-size: 11px;
+      color: #787877;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
   </style>
 </head>
 <body>
@@ -213,6 +358,23 @@
   <div class="controls">
     <button class="refresh-btn" id="refreshBtn" onclick="manualRefresh()">Refresh Now</button>
     <span class="auto-refresh-label" id="countdown"></span>
+    <button class="manage-btn" id="manageBtn" onclick="toggleSettings()">&#9881; Manage Accounts</button>
+  </div>
+
+  <div class="settings-panel" id="settingsPanel">
+    <h2>Manage Accounts</h2>
+    <div class="field-labels">
+      <span>Name</span>
+      <span>Org ID</span>
+      <span>Session Cookie</span>
+      <span></span>
+    </div>
+    <div id="accountRows"></div>
+    <div class="settings-actions">
+      <button class="add-btn" onclick="addAccountRow()">+ Add Account</button>
+      <button class="save-btn" id="saveBtn" onclick="saveAccounts()">Save</button>
+      <span class="save-status" id="saveStatus"></span>
+    </div>
   </div>
 
   <div class="grid" id="grid">
@@ -380,6 +542,102 @@
         await fetchData('/api/usage');
       } catch (e) {
         console.error('Auto-refresh failed:', e);
+      }
+    }
+
+    // Account management
+    let editAccounts = [];
+
+    function toggleSettings() {
+      const panel = document.getElementById('settingsPanel');
+      const isOpen = panel.classList.toggle('open');
+      if (isOpen) loadAccountsForEdit();
+    }
+
+    async function loadAccountsForEdit() {
+      try {
+        const res = await fetch('/api/accounts');
+        editAccounts = await res.json();
+      } catch (e) {
+        editAccounts = [];
+      }
+      renderAccountRows();
+    }
+
+    function renderAccountRows() {
+      const container = document.getElementById('accountRows');
+      container.innerHTML = editAccounts.map((a, i) => `
+        <div class="account-row">
+          <input type="text" placeholder="Name" value="${escapeAttr(a.name)}" data-idx="${i}" data-field="name">
+          <input type="text" placeholder="Org ID" value="${escapeAttr(a.orgId)}" data-idx="${i}" data-field="orgId">
+          <input type="text" placeholder="Session Cookie" value="${escapeAttr(a.sessionCookie)}" data-idx="${i}" data-field="sessionCookie">
+          <button class="delete-btn" onclick="removeAccountRow(${i})">Delete</button>
+        </div>
+      `).join('');
+      container.querySelectorAll('input').forEach(input => {
+        input.addEventListener('input', (e) => {
+          const idx = parseInt(e.target.dataset.idx);
+          const field = e.target.dataset.field;
+          editAccounts[idx][field] = e.target.value;
+        });
+      });
+      document.getElementById('saveStatus').textContent = '';
+    }
+
+    function escapeAttr(str) {
+      return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function addAccountRow() {
+      editAccounts.push({ name: '', orgId: '', sessionCookie: '' });
+      renderAccountRows();
+    }
+
+    function removeAccountRow(idx) {
+      editAccounts.splice(idx, 1);
+      renderAccountRows();
+    }
+
+    async function saveAccounts() {
+      const btn = document.getElementById('saveBtn');
+      const status = document.getElementById('saveStatus');
+      btn.disabled = true;
+      status.textContent = 'Saving...';
+      status.className = 'save-status';
+
+      // Filter out accounts where cookie is still masked (unchanged)
+      const hasMasked = editAccounts.some(a => /^•/.test(a.sessionCookie));
+      if (hasMasked) {
+        // Need to merge: load originals and keep unchanged cookies
+        try {
+          // We can't get unmasked cookies from the server, so warn user
+          const unchanged = editAccounts.filter(a => /^•/.test(a.sessionCookie));
+          if (unchanged.length > 0) {
+            status.textContent = 'Replace masked cookie values (•••) with actual cookies before saving';
+            status.className = 'save-status error';
+            btn.disabled = false;
+            return;
+          }
+        } catch (e) { /* proceed */ }
+      }
+
+      try {
+        const res = await fetch('/api/accounts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(editAccounts)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Save failed');
+        status.textContent = `Saved ${data.count} account(s)`;
+        status.className = 'save-status';
+        // Refresh dashboard data
+        await autoRefresh();
+      } catch (e) {
+        status.textContent = e.message;
+        status.className = 'save-status error';
+      } finally {
+        btn.disabled = false;
       }
     }
 

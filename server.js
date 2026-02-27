@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10001;
 const ACCOUNTS_PATH = process.env.ACCOUNTS_PATH || path.join(__dirname, 'accounts.json');
 const POLL_INTERVAL_MS = 60 * 1000;
 
@@ -80,7 +80,41 @@ async function pollAllAccounts() {
   cachedUsage = results;
 }
 
+app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+function maskCookie(cookie) {
+  if (!cookie || cookie.length <= 8) return '********';
+  return '•'.repeat(cookie.length - 8) + cookie.slice(-8);
+}
+
+app.get('/api/accounts', (_req, res) => {
+  const accounts = loadAccounts();
+  res.json(accounts.map(a => ({
+    name: a.name,
+    orgId: a.orgId,
+    sessionCookie: maskCookie(a.sessionCookie)
+  })));
+});
+
+app.post('/api/accounts', async (req, res) => {
+  const accounts = req.body;
+  if (!Array.isArray(accounts)) {
+    return res.status(400).json({ error: 'Expected an array of accounts' });
+  }
+  for (const a of accounts) {
+    if (!a.name || !a.orgId || !a.sessionCookie) {
+      return res.status(400).json({ error: 'Each account must have name, orgId, and sessionCookie' });
+    }
+  }
+  try {
+    fs.writeFileSync(ACCOUNTS_PATH, JSON.stringify(accounts, null, 2) + '\n', 'utf-8');
+    await pollAllAccounts();
+    res.json({ ok: true, count: accounts.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 app.get('/api/usage', (_req, res) => {
   res.json({
@@ -100,11 +134,10 @@ app.get('/api/refresh', async (_req, res) => {
 async function start() {
   const accounts = loadAccounts();
   if (accounts.length === 0) {
-    console.error('No accounts configured. Copy accounts.example.json to accounts.json and fill in your details.');
-    process.exit(1);
+    console.log('No accounts configured. Add accounts via the dashboard UI or copy accounts.example.json to accounts.json.');
+  } else {
+    console.log(`Loaded ${accounts.length} account(s): ${accounts.map(a => a.name).join(', ')}`);
   }
-
-  console.log(`Loaded ${accounts.length} account(s): ${accounts.map(a => a.name).join(', ')}`);
 
   await pollAllAccounts();
 
