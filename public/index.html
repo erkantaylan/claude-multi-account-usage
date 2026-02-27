@@ -361,6 +361,43 @@
       color: #a3a3a0;
       margin-bottom: 10px;
     }
+
+    .io-section {
+      border-top: 1px solid #3a3a3a;
+      margin-top: 16px;
+      padding-top: 16px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .io-btn {
+      background: transparent;
+      color: #a3a3a0;
+      border: 1px solid #3a3a3a;
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+
+    .io-btn:hover {
+      border-color: #5a5a5a;
+      color: #e8e6e1;
+    }
+
+    .io-status {
+      font-size: 12px;
+      min-height: 18px;
+    }
+
+    .io-status.ok { color: #4ade80; }
+    .io-status.error { color: #ef4444; }
+
+    #importFileInput {
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -395,6 +432,12 @@
         <span></span>
       </div>
       <div class="row-status" id="addStatus"></div>
+    </div>
+    <div class="io-section">
+      <button class="io-btn" onclick="exportAccounts()">Export</button>
+      <button class="io-btn" onclick="document.getElementById('importFileInput').click()">Import</button>
+      <input type="file" id="importFileInput" accept=".json" onchange="importAccounts(event)">
+      <span class="io-status" id="ioStatus"></span>
     </div>
   </div>
 
@@ -697,6 +740,41 @@
       } catch (e) {
         statusEl.textContent = e.message;
         statusEl.className = 'row-status error';
+      }
+    }
+
+    function exportAccounts() {
+      window.location.href = '/api/accounts/export';
+    }
+
+    async function importAccounts(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const statusEl = document.getElementById('ioStatus');
+      statusEl.textContent = 'Importing...';
+      statusEl.className = 'io-status';
+
+      try {
+        const text = await file.text();
+        const accounts = JSON.parse(text);
+        if (!Array.isArray(accounts)) throw new Error('File must contain a JSON array');
+        const res = await fetch('/api/accounts/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(accounts)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Import failed');
+        statusEl.textContent = `Imported ${data.count} account(s)`;
+        statusEl.className = 'io-status ok';
+        await loadAccountsForEdit();
+        await autoRefresh();
+        setTimeout(() => { statusEl.textContent = ''; }, 3000);
+      } catch (e) {
+        statusEl.textContent = e.message;
+        statusEl.className = 'io-status error';
+      } finally {
+        event.target.value = '';
       }
     }
 

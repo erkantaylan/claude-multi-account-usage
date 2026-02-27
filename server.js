@@ -154,6 +154,32 @@ app.delete('/api/accounts/:index', async (req, res) => {
   }
 });
 
+app.get('/api/accounts/export', (_req, res) => {
+  const accounts = loadAccounts();
+  res.setHeader('Content-Disposition', 'attachment; filename="accounts.json"');
+  res.setHeader('Content-Type', 'application/json');
+  res.json(accounts);
+});
+
+app.post('/api/accounts/import', async (req, res) => {
+  const accounts = req.body;
+  if (!Array.isArray(accounts)) {
+    return res.status(400).json({ error: 'Expected an array of accounts' });
+  }
+  for (const a of accounts) {
+    if (!a.name || !a.orgId || !a.sessionCookie) {
+      return res.status(400).json({ error: 'Each account must have name, orgId, and sessionCookie' });
+    }
+  }
+  try {
+    saveAccountsToDisk(accounts);
+    await pollAllAccounts();
+    res.json({ ok: true, count: accounts.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/usage', (_req, res) => {
   res.json({
     accounts: Object.values(cachedUsage),
