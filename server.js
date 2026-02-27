@@ -97,20 +97,58 @@ app.get('/api/accounts', (_req, res) => {
   })));
 });
 
+function saveAccountsToDisk(accounts) {
+  fs.writeFileSync(ACCOUNTS_PATH, JSON.stringify(accounts, null, 2) + '\n', 'utf-8');
+}
+
 app.post('/api/accounts', async (req, res) => {
-  const accounts = req.body;
-  if (!Array.isArray(accounts)) {
-    return res.status(400).json({ error: 'Expected an array of accounts' });
-  }
-  for (const a of accounts) {
-    if (!a.name || !a.orgId || !a.sessionCookie) {
-      return res.status(400).json({ error: 'Each account must have name, orgId, and sessionCookie' });
-    }
+  const account = req.body;
+  if (!account.name || !account.orgId || !account.sessionCookie) {
+    return res.status(400).json({ error: 'name, orgId, and sessionCookie are required' });
   }
   try {
-    fs.writeFileSync(ACCOUNTS_PATH, JSON.stringify(accounts, null, 2) + '\n', 'utf-8');
+    const accounts = loadAccounts();
+    accounts.push({ name: account.name, orgId: account.orgId, sessionCookie: account.sessionCookie });
+    saveAccountsToDisk(accounts);
     await pollAllAccounts();
-    res.json({ ok: true, count: accounts.length });
+    res.json({ ok: true, index: accounts.length - 1 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/accounts/:index', async (req, res) => {
+  const idx = parseInt(req.params.index, 10);
+  const updates = req.body;
+  try {
+    const accounts = loadAccounts();
+    if (idx < 0 || idx >= accounts.length) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+    if (updates.name) accounts[idx].name = updates.name;
+    if (updates.orgId) accounts[idx].orgId = updates.orgId;
+    if (updates.sessionCookie && !updates.sessionCookie.startsWith('•')) {
+      accounts[idx].sessionCookie = updates.sessionCookie;
+    }
+    saveAccountsToDisk(accounts);
+    await pollAllAccounts();
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/accounts/:index', async (req, res) => {
+  const idx = parseInt(req.params.index, 10);
+  try {
+    const accounts = loadAccounts();
+    if (idx < 0 || idx >= accounts.length) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+    accounts.splice(idx, 1);
+    saveAccountsToDisk(accounts);
+    await pollAllAccounts();
+    res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

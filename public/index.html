@@ -240,14 +240,6 @@
       margin-bottom: 20px;
     }
 
-    .account-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr 2fr auto;
-      gap: 10px;
-      align-items: center;
-      margin-bottom: 10px;
-    }
-
     .account-row input {
       background: #1a1a1a;
       border: 1px solid #3a3a3a;
@@ -304,39 +296,40 @@
       border-color: #2c84db;
     }
 
-    .save-btn {
+    .row-save-btn {
       background: #2c84db;
       color: #fff;
       border: none;
       border-radius: 6px;
-      padding: 8px 20px;
+      padding: 8px 12px;
       font-size: 13px;
       cursor: pointer;
       transition: opacity 0.2s;
+      white-space: nowrap;
     }
 
-    .save-btn:hover {
+    .row-save-btn:hover {
       opacity: 0.85;
     }
 
-    .save-btn:disabled {
+    .row-save-btn:disabled {
       opacity: 0.5;
       cursor: not-allowed;
     }
 
-    .save-status {
-      font-size: 13px;
-      color: #4ade80;
-      align-self: center;
+    .row-status {
+      font-size: 12px;
+      margin-top: 4px;
+      min-height: 18px;
+      grid-column: 1 / -1;
     }
 
-    .save-status.error {
-      color: #ef4444;
-    }
+    .row-status.ok { color: #4ade80; }
+    .row-status.error { color: #ef4444; }
 
     .field-labels {
       display: grid;
-      grid-template-columns: 1fr 1fr 2fr auto;
+      grid-template-columns: 1fr 1fr 2fr auto auto;
       gap: 10px;
       margin-bottom: 6px;
     }
@@ -346,6 +339,27 @@
       color: #787877;
       text-transform: uppercase;
       letter-spacing: 0.5px;
+    }
+
+    .account-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 2fr auto auto;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .new-account-section {
+      border-top: 1px solid #3a3a3a;
+      margin-top: 16px;
+      padding-top: 16px;
+    }
+
+    .new-account-section h3 {
+      font-size: 14px;
+      font-weight: 500;
+      color: #a3a3a0;
+      margin-bottom: 10px;
     }
   </style>
 </head>
@@ -368,12 +382,19 @@
       <span>Org ID</span>
       <span>Session Cookie</span>
       <span></span>
+      <span></span>
     </div>
     <div id="accountRows"></div>
-    <div class="settings-actions">
-      <button class="add-btn" onclick="addAccountRow()">+ Add Account</button>
-      <button class="save-btn" id="saveBtn" onclick="saveAccounts()">Save</button>
-      <span class="save-status" id="saveStatus"></span>
+    <div class="new-account-section">
+      <h3>Add New Account</h3>
+      <div class="account-row">
+        <input type="text" placeholder="Name" id="newName">
+        <input type="text" placeholder="Org ID" id="newOrgId">
+        <input type="text" placeholder="Session Cookie (sk-ant-sid...)" id="newCookie">
+        <button class="row-save-btn" onclick="addAccount()">Add</button>
+        <span></span>
+      </div>
+      <div class="row-status" id="addStatus"></div>
     </div>
   </div>
 
@@ -567,77 +588,115 @@
     function renderAccountRows() {
       const container = document.getElementById('accountRows');
       container.innerHTML = editAccounts.map((a, i) => `
-        <div class="account-row">
+        <div class="account-row" id="row-${i}">
           <input type="text" placeholder="Name" value="${escapeAttr(a.name)}" data-idx="${i}" data-field="name">
           <input type="text" placeholder="Org ID" value="${escapeAttr(a.orgId)}" data-idx="${i}" data-field="orgId">
-          <input type="text" placeholder="Session Cookie" value="${escapeAttr(a.sessionCookie)}" data-idx="${i}" data-field="sessionCookie">
-          <button class="delete-btn" onclick="removeAccountRow(${i})">Delete</button>
+          <input type="text" placeholder="New cookie to update (leave to keep)" value="" data-idx="${i}" data-field="sessionCookie">
+          <button class="row-save-btn" onclick="saveRow(${i})">Save</button>
+          <button class="delete-btn" onclick="deleteRow(${i})">Delete</button>
         </div>
+        <div class="row-status" id="row-status-${i}"></div>
       `).join('');
       container.querySelectorAll('input').forEach(input => {
         input.addEventListener('input', (e) => {
           const idx = parseInt(e.target.dataset.idx);
           const field = e.target.dataset.field;
-          editAccounts[idx][field] = e.target.value;
+          editAccounts[idx]['_' + field] = e.target.value;
         });
       });
-      document.getElementById('saveStatus').textContent = '';
     }
 
     function escapeAttr(str) {
       return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
 
-    function addAccountRow() {
-      editAccounts.push({ name: '', orgId: '', sessionCookie: '' });
-      renderAccountRows();
-    }
-
-    function removeAccountRow(idx) {
-      editAccounts.splice(idx, 1);
-      renderAccountRows();
-    }
-
-    async function saveAccounts() {
-      const btn = document.getElementById('saveBtn');
-      const status = document.getElementById('saveStatus');
+    async function saveRow(idx) {
+      const statusEl = document.getElementById(`row-status-${idx}`);
+      const btn = document.querySelector(`#row-${idx} .row-save-btn`);
       btn.disabled = true;
-      status.textContent = 'Saving...';
-      status.className = 'save-status';
+      statusEl.textContent = 'Saving...';
+      statusEl.className = 'row-status';
 
-      // Filter out accounts where cookie is still masked (unchanged)
-      const hasMasked = editAccounts.some(a => /^•/.test(a.sessionCookie));
-      if (hasMasked) {
-        // Need to merge: load originals and keep unchanged cookies
-        try {
-          // We can't get unmasked cookies from the server, so warn user
-          const unchanged = editAccounts.filter(a => /^•/.test(a.sessionCookie));
-          if (unchanged.length > 0) {
-            status.textContent = 'Replace masked cookie values (•••) with actual cookies before saving';
-            status.className = 'save-status error';
-            btn.disabled = false;
-            return;
-          }
-        } catch (e) { /* proceed */ }
+      const row = document.querySelectorAll(`#row-${idx} input`);
+      const name = row[0].value.trim();
+      const orgId = row[1].value.trim();
+      const cookie = row[2].value.trim();
+
+      const updates = {};
+      if (name) updates.name = name;
+      if (orgId) updates.orgId = orgId;
+      if (cookie) updates.sessionCookie = cookie;
+
+      try {
+        const res = await fetch(`/api/accounts/${idx}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updates)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Save failed');
+        statusEl.textContent = 'Saved';
+        statusEl.className = 'row-status ok';
+        row[2].value = '';
+        await autoRefresh();
+        setTimeout(() => { statusEl.textContent = ''; }, 3000);
+      } catch (e) {
+        statusEl.textContent = e.message;
+        statusEl.className = 'row-status error';
+      } finally {
+        btn.disabled = false;
       }
+    }
+
+    async function deleteRow(idx) {
+      const statusEl = document.getElementById(`row-status-${idx}`);
+      if (!confirm(`Delete account "${editAccounts[idx].name}"?`)) return;
+      try {
+        const res = await fetch(`/api/accounts/${idx}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Delete failed');
+        await loadAccountsForEdit();
+        await autoRefresh();
+      } catch (e) {
+        statusEl.textContent = e.message;
+        statusEl.className = 'row-status error';
+      }
+    }
+
+    async function addAccount() {
+      const statusEl = document.getElementById('addStatus');
+      const name = document.getElementById('newName').value.trim();
+      const orgId = document.getElementById('newOrgId').value.trim();
+      const cookie = document.getElementById('newCookie').value.trim();
+
+      if (!name || !orgId || !cookie) {
+        statusEl.textContent = 'All three fields are required';
+        statusEl.className = 'row-status error';
+        return;
+      }
+
+      statusEl.textContent = 'Adding...';
+      statusEl.className = 'row-status';
 
       try {
         const res = await fetch('/api/accounts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(editAccounts)
+          body: JSON.stringify({ name, orgId, sessionCookie: cookie })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Save failed');
-        status.textContent = `Saved ${data.count} account(s)`;
-        status.className = 'save-status';
-        // Refresh dashboard data
+        if (!res.ok) throw new Error(data.error || 'Add failed');
+        document.getElementById('newName').value = '';
+        document.getElementById('newOrgId').value = '';
+        document.getElementById('newCookie').value = '';
+        statusEl.textContent = 'Added';
+        statusEl.className = 'row-status ok';
+        await loadAccountsForEdit();
         await autoRefresh();
+        setTimeout(() => { statusEl.textContent = ''; }, 3000);
       } catch (e) {
-        status.textContent = e.message;
-        status.className = 'save-status error';
-      } finally {
-        btn.disabled = false;
+        statusEl.textContent = e.message;
+        statusEl.className = 'row-status error';
       }
     }
 
