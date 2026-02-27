@@ -1,0 +1,12 @@
+[
+  {
+    "name": "Personal",
+    "orgId": "your-org-id-here",
+    "sessionCookie": "your-sessionKey-cookie-value-here"
+  },
+  {
+    "name": "Work",
+    "orgId": "another-org-id-here",
+    "sessionCookie": "another-sessionKey-cookie-value-here"
+  }
+]

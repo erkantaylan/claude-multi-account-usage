@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude Usage Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a1a;
+      color: #e8e6e1;
+      min-height: 100vh;
+      padding: 32px;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .header h1 {
+      font-size: 24px;
+      font-weight: 600;
+      color: #faf9f5;
+      margin-bottom: 4px;
+    }
+
+    .header .subtitle {
+      font-size: 13px;
+      color: #787877;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      border-radius: 12px;
+      padding: 24px;
+      transition: border-color 0.2s;
+    }
+
+    .card:hover {
+      border-color: #4a4a4a;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .account-name {
+      font-size: 18px;
+      font-weight: 600;
+      color: #faf9f5;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #4ade80;
+    }
+
+    .status-dot.error {
+      background: #ef4444;
+    }
+
+    .usage-section {
+      margin-bottom: 16px;
+    }
+
+    .usage-section:last-child {
+      margin-bottom: 0;
+    }
+
+    .usage-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 8px;
+    }
+
+    .usage-label .label {
+      font-size: 13px;
+      color: #a3a3a0;
+      font-weight: 500;
+    }
+
+    .usage-label .value {
+      font-size: 14px;
+      font-weight: 600;
+      color: #faf9f5;
+    }
+
+    .bar-container {
+      position: relative;
+      width: 100%;
+      height: 10px;
+      background: transparent;
+      border: 1px solid #787877;
+      border-radius: 5px;
+      overflow: visible;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 4px 0 0 4px;
+      transition: width 0.5s ease, background-color 0.3s ease;
+      background: #2c84db;
+    }
+
+    .bar-fill.full {
+      border-radius: 4px;
+    }
+
+    .bar-fill.warn {
+      background: #ce2029;
+    }
+
+    .bar-marker {
+      position: absolute;
+      top: -2px;
+      bottom: -2px;
+      width: 2px;
+      background: #fff;
+      pointer-events: none;
+    }
+
+    .reset-text {
+      font-size: 12px;
+      color: #787877;
+      margin-top: 6px;
+    }
+
+    .error-text {
+      font-size: 12px;
+      color: #ef4444;
+      margin-top: 4px;
+    }
+
+    .last-updated {
+      font-size: 11px;
+      color: #555;
+      margin-top: 16px;
+      text-align: right;
+    }
+
+    .no-data {
+      text-align: center;
+      color: #787877;
+      padding: 8px 0;
+      font-size: 13px;
+    }
+
+    .loading {
+      text-align: center;
+      color: #787877;
+      padding: 80px 0;
+      font-size: 16px;
+    }
+
+    .refresh-btn {
+      background: #2c84db;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 16px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .refresh-btn:hover {
+      opacity: 0.85;
+    }
+
+    .refresh-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+
+    .auto-refresh-label {
+      font-size: 12px;
+      color: #787877;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Claude Usage Dashboard</h1>
+    <p class="subtitle">Multi-account usage monitoring</p>
+  </div>
+
+  <div class="controls">
+    <button class="refresh-btn" id="refreshBtn" onclick="manualRefresh()">Refresh Now</button>
+    <span class="auto-refresh-label" id="countdown"></span>
+  </div>
+
+  <div class="grid" id="grid">
+    <div class="loading">Loading accounts...</div>
+  </div>
+
+  <script>
+    let state = { accounts: [], pollIntervalMs: 60000 };
+    let nextRefreshAt = 0;
+    let refreshing = false;
+
+    function formatCountdown(timestampMs) {
+      const diffMs = timestampMs - Date.now();
+      if (diffMs <= 0) return '0m';
+      const totalMinutes = Math.round(diffMs / (1000 * 60));
+      if (totalMinutes < 60) return `${totalMinutes}m`;
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+      if (hours < 24) return `${hours}h ${minutes}m`;
+      const days = Math.floor(hours / 24);
+      const remHours = hours % 24;
+      return `${days}d ${remHours}h`;
+    }
+
+    function formatTime(isoString) {
+      if (!isoString) return 'never';
+      const d = new Date(isoString);
+      return d.toLocaleTimeString();
+    }
+
+    function calcWindowMarker(resetsAt, windowHoursMs) {
+      if (!resetsAt) return null;
+      const resetMs = Date.parse(resetsAt);
+      const windowStartMs = resetMs - windowHoursMs;
+      const now = Date.now();
+      const total = resetMs - windowStartMs;
+      const elapsed = Math.max(0, Math.min(total, now - windowStartMs));
+      return total > 0 ? (elapsed / total) * 100 : 0;
+    }
+
+    function renderCard(account) {
+      const { name, usage, error, lastUpdated } = account;
+      const hasError = !!error;
+      const hasUsage = !!usage;
+
+      let sectionsHtml = '';
+
+      if (hasUsage) {
+        if (usage.five_hour) {
+          const u = usage.five_hour;
+          const pct = Math.round(u.utilization * 10) / 10;
+          const width = Math.max(0, Math.min(100, u.utilization));
+          const warn = width >= 90 ? ' warn' : '';
+          const full = width >= 99.5 ? ' full' : '';
+          const resetText = u.resets_at ? `Resets in ${formatCountdown(Date.parse(u.resets_at))}` : '';
+          const markerPct = calcWindowMarker(u.resets_at, 5 * 60 * 60 * 1000);
+          const markerHtml = markerPct !== null ? `<div class="bar-marker" style="left:${markerPct}%"></div>` : '';
+
+          sectionsHtml += `
+            <div class="usage-section">
+              <div class="usage-label">
+                <span class="label">Session (5h)</span>
+                <span class="value">${pct}%</span>
+              </div>
+              <div class="bar-container">
+                <div class="bar-fill${warn}${full}" style="width:${width}%"></div>
+                ${markerHtml}
+              </div>
+              ${resetText ? `<div class="reset-text">${resetText}</div>` : ''}
+            </div>`;
+        }
+
+        if (usage.seven_day) {
+          const u = usage.seven_day;
+          const pct = Math.round(u.utilization * 10) / 10;
+          const width = Math.max(0, Math.min(100, u.utilization));
+          const warn = width >= 90 ? ' warn' : '';
+          const full = width >= 99.5 ? ' full' : '';
+          const resetText = u.resets_at ? `Resets in ${formatCountdown(Date.parse(u.resets_at))}` : '';
+          const markerPct = calcWindowMarker(u.resets_at, 7 * 24 * 60 * 60 * 1000);
+          const markerHtml = markerPct !== null ? `<div class="bar-marker" style="left:${markerPct}%"></div>` : '';
+
+          sectionsHtml += `
+            <div class="usage-section">
+              <div class="usage-label">
+                <span class="label">Weekly (7d)</span>
+                <span class="value">${pct}%</span>
+              </div>
+              <div class="bar-container">
+                <div class="bar-fill${warn}${full}" style="width:${width}%"></div>
+                ${markerHtml}
+              </div>
+              ${resetText ? `<div class="reset-text">${resetText}</div>` : ''}
+            </div>`;
+        }
+      }
+
+      if (!hasUsage && !hasError) {
+        sectionsHtml = '<div class="no-data">No usage data available</div>';
+      }
+
+      const errorHtml = hasError ? `<div class="error-text">Error: ${escapeHtml(error)}</div>` : '';
+      const updatedHtml = lastUpdated ? `<div class="last-updated">Updated ${formatTime(lastUpdated)}</div>` : '';
+
+      return `
+        <div class="card">
+          <div class="card-header">
+            <span class="account-name">${escapeHtml(name)}</span>
+            <span class="status-dot${hasError && !hasUsage ? ' error' : ''}"></span>
+          </div>
+          ${sectionsHtml}
+          ${errorHtml}
+          ${updatedHtml}
+        </div>`;
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function render() {
+      const grid = document.getElementById('grid');
+      if (state.accounts.length === 0) {
+        grid.innerHTML = '<div class="loading">No accounts configured</div>';
+        return;
+      }
+      grid.innerHTML = state.accounts.map(renderCard).join('');
+    }
+
+    function updateCountdown() {
+      const el = document.getElementById('countdown');
+      const diff = Math.max(0, Math.ceil((nextRefreshAt - Date.now()) / 1000));
+      el.textContent = `Auto-refresh in ${diff}s`;
+    }
+
+    async function fetchData(endpoint) {
+      const res = await fetch(endpoint);
+      const data = await res.json();
+      state = data;
+      nextRefreshAt = Date.now() + state.pollIntervalMs;
+      render();
+    }
+
+    async function manualRefresh() {
+      if (refreshing) return;
+      refreshing = true;
+      const btn = document.getElementById('refreshBtn');
+      btn.disabled = true;
+      btn.textContent = 'Refreshing...';
+      try {
+        await fetchData('/api/refresh');
+      } catch (e) {
+        console.error('Refresh failed:', e);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Refresh Now';
+        refreshing = false;
+      }
+    }
+
+    async function autoRefresh() {
+      try {
+        await fetchData('/api/usage');
+      } catch (e) {
+        console.error('Auto-refresh failed:', e);
+      }
+    }
+
+    async function init() {
+      await autoRefresh();
+      setInterval(() => {
+        updateCountdown();
+        // Re-render to update countdowns
+        if (state.accounts.length > 0) render();
+      }, 1000);
+      setInterval(autoRefresh, state.pollIntervalMs);
+    }
+
+    init();
+  </script>
+</body>
+</html>
