@@ -5,7 +5,7 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 10001;
 const ACCOUNTS_PATH = process.env.ACCOUNTS_PATH || path.join(__dirname, 'accounts.json');
-const POLL_INTERVAL_MS = 60 * 1000;
+const POLL_INTERVAL_MS = 5 * 60 * 1000;
 
 let cachedUsage = {};
 

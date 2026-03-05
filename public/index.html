@@ -34,8 +34,8 @@
 
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-      gap: 20px;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 12px;
       max-width: 1200px;
       margin: 0 auto;
     }
@@ -43,8 +43,8 @@
     .card {
       background: #2a2a2a;
       border: 1px solid #3a3a3a;
-      border-radius: 12px;
-      padding: 24px;
+      border-radius: 8px;
+      padding: 14px;
       transition: border-color 0.2s;
     }
 
@@ -56,11 +56,11 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 20px;
+      margin-bottom: 10px;
     }
 
     .account-name {
-      font-size: 18px;
+      font-size: 14px;
       font-weight: 600;
       color: #faf9f5;
     }
@@ -77,7 +77,7 @@
     }
 
     .usage-section {
-      margin-bottom: 16px;
+      margin-bottom: 8px;
     }
 
     .usage-section:last-child {
@@ -88,17 +88,17 @@
       display: flex;
       justify-content: space-between;
       align-items: baseline;
-      margin-bottom: 8px;
+      margin-bottom: 4px;
     }
 
     .usage-label .label {
-      font-size: 13px;
+      font-size: 11px;
       color: #a3a3a0;
       font-weight: 500;
     }
 
     .usage-label .value {
-      font-size: 14px;
+      font-size: 12px;
       font-weight: 600;
       color: #faf9f5;
     }
@@ -106,7 +106,7 @@
     .bar-container {
       position: relative;
       width: 100%;
-      height: 10px;
+      height: 8px;
       background: transparent;
       border: 1px solid #787877;
       border-radius: 5px;
@@ -138,9 +138,9 @@
     }
 
     .reset-text {
-      font-size: 12px;
+      font-size: 10px;
       color: #787877;
-      margin-top: 6px;
+      margin-top: 4px;
     }
 
     .error-text {
@@ -150,9 +150,9 @@
     }
 
     .last-updated {
-      font-size: 11px;
+      font-size: 10px;
       color: #555;
-      margin-top: 16px;
+      margin-top: 8px;
       text-align: right;
     }
 
@@ -568,7 +568,8 @@
         grid.innerHTML = '<div class="loading">No accounts configured</div>';
         return;
       }
-      grid.innerHTML = state.accounts.map(renderCard).join('');
+      const sorted = [...state.accounts].sort((a, b) => a.name.localeCompare(b.name));
+      grid.innerHTML = sorted.map(renderCard).join('');
     }
 
     function updateCountdown() {
