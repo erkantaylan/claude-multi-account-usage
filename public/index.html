@@ -517,7 +517,8 @@
           const width = Math.max(0, Math.min(100, u.utilization));
           const warn = width >= 90 ? ' warn' : '';
           const full = width >= 99.5 ? ' full' : '';
-          const resetText = u.resets_at ? `Resets in ${formatCountdown(Date.parse(u.resets_at))}` : '';
+          const resetDate = u.resets_at ? new Date(u.resets_at) : null;
+          const resetText = resetDate ? `Resets in ${formatCountdown(resetDate.getTime())} (${resetDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${resetDate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })})` : '';
           const markerPct = calcWindowMarker(u.resets_at, 7 * 24 * 60 * 60 * 1000);
           const markerHtml = markerPct !== null ? `<div class="bar-marker" style="left:${markerPct}%"></div>` : '';
 
