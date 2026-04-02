@@ -4,3 +4,4 @@
 .beads/
 node_modules/
 accounts.json
+tray/src-tauri/target/

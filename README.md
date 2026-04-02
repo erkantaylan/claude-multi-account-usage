@@ -1,15 +1,61 @@
-# Claude Multi-Account Usage Dashboard
+# Claude Multi-Account Usage Monitor
 
-A self-hosted dashboard for monitoring Claude.ai usage across multiple accounts. Shows session (5h) and weekly (7d) utilization with reset countdowns.
+Monitor Claude.ai usage across multiple accounts. Includes a web dashboard and a system tray app.
 
-## Quick Start
+## Structure
+
+```
+cmau/
+├── accounts.example.json    # Example config
+├── web/                     # Web dashboard (Node.js/Express)
+│   ├── server.js
+│   ├── package.json
+│   └── public/index.html
+└── tray/                    # System tray app (Tauri/Rust)
+    ├── src/index.html
+    └── src-tauri/
+        ├── Cargo.toml
+        └── src/main.rs
+```
+
+## Web Dashboard
 
 ```bash
+cd web
 npm install
 npm start
 ```
 
-Open http://localhost:10001 and add your accounts via the UI.
+Open http://localhost:10001. Add accounts via the UI.
+
+## System Tray App
+
+Sits in the Ubuntu AppIndicator area (top-right). Click the icon to show a compact usage popup.
+
+### Build & Run
+
+```bash
+cd tray
+cargo run --manifest-path src-tauri/Cargo.toml
+```
+
+### Features
+
+- System tray icon with color-coded usage level (green/yellow/red)
+- Compact popup showing all accounts with 5h session + 7d weekly utilization
+- Progress bars with reset countdowns
+- Auto-refresh every 5 minutes
+- Right-click menu: Refresh Now, Quit
+
+### Configuration
+
+Set `ACCOUNTS_PATH` to point to your accounts.json:
+
+```bash
+ACCOUNTS_PATH=/path/to/accounts.json cargo run --manifest-path src-tauri/Cargo.toml
+```
+
+If not set, looks for `accounts.json` next to the binary.
 
 ## Getting Your Credentials
 
@@ -36,7 +82,7 @@ Each account needs two things: **Organization ID** and **Session Cookie**.
 })();
 ```
 
-4. Copy the Org ID and Session Cookie into the dashboard.
+4. Copy the Org ID and Session Cookie into the config.
 
 ### Option 2: DevTools manually
 
@@ -47,34 +93,16 @@ Each account needs two things: **Organization ID** and **Session Cookie**.
 
 **Session Cookie:**
 1. Same Cookies panel
-2. Find the `sessionKey` cookie (starts with `sk-ant-sid...`) — that value is your Session Cookie
-   - Note: this cookie is `HttpOnly` so `document.cookie` can't read it — you must grab it from the Cookies panel
+2. Find the `sessionKey` cookie (starts with `sk-ant-sid...`)
+   - Note: this cookie is `HttpOnly` so `document.cookie` can't read it — grab it from the Cookies panel
 
-### Option 3: Network tab
-
-1. DevTools (F12) → Network tab
-2. Send any message in Claude
-3. Click any request to `claude.ai/api/organizations/...`
-4. The URL contains your Org ID: `/api/organizations/{THIS_IS_YOUR_ORG_ID}/...`
-5. In Request Headers, find `Cookie:` → the `sessionKey=...` value is your Session Cookie
-
-## Configuration
-
-Accounts can be managed two ways:
-
-- **Web UI**: Click "Manage Accounts" on the dashboard
-- **JSON file**: Edit `accounts.json` directly:
+## accounts.json Format
 
 ```json
 [
   {
     "name": "Personal",
     "orgId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-    "sessionCookie": "sk-ant-..."
-  },
-  {
-    "name": "Work",
-    "orgId": "yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy",
     "sessionCookie": "sk-ant-..."
   }
 ]
@@ -84,11 +112,11 @@ Accounts can be managed two ways:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | `10001` | Dashboard port |
+| `PORT` | `10001` | Web dashboard port |
 | `ACCOUNTS_PATH` | `./accounts.json` | Path to accounts config |
 
 ## Notes
 
-- Session cookies expire periodically — you'll need to update them when they do
-- The dashboard polls each account every 60 seconds
-- Listens on `127.0.0.1` only (not exposed to network)
+- Session cookies expire periodically — update them when they do
+- Web dashboard polls every 5 minutes, tray app polls every 5 minutes
+- Web dashboard listens on `127.0.0.1` only
